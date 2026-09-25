@@ -41,15 +41,16 @@ local KNOB_R = 5      -- 滑块旋钮半径
 
 -- kind = 'scale'  → 写 ScalePercent + Scale
 -- kind = 'color'  → 写 var 指向的颜色变量的 ch 通道
+--
+-- 颜色**不走滑块**了：改用 RainRGB4 取色器，动作直接写在 Settings.ini 的
+-- 色块 meter 上（不经 Lua）。这里只留整体缩放。
 local SLIDERS = {
-    Scale   = { min = 40, max = 200, step = 5, kind = 'scale' },
-    AccentR = { min = 0, max = 255, step = 1, kind = 'color', var = 'ColorAccent', ch = 'R' },
-    AccentG = { min = 0, max = 255, step = 1, kind = 'color', var = 'ColorAccent', ch = 'G' },
-    AccentB = { min = 0, max = 255, step = 1, kind = 'color', var = 'ColorAccent', ch = 'B' },
-    TextR   = { min = 0, max = 255, step = 1, kind = 'color', var = 'ColorText',   ch = 'R' },
-    TextG   = { min = 0, max = 255, step = 1, kind = 'color', var = 'ColorText',   ch = 'G' },
-    TextB   = { min = 0, max = 255, step = 1, kind = 'color', var = 'ColorText',   ch = 'B' },
+    Scale = { min = 40, max = 200, step = 5, kind = 'scale' },
 }
+
+-- 取色器涉及的变量：面板初始化时要把它们推给主皮肤。
+-- RainRGB4 只能刷新一个皮肤（我们填的是面板自己），所以主皮肤靠这一步同步。
+local COLOR_VARS = { 'ColorAccent', 'ColorText' }
 
 -- 文字输入：变量名 → InputText 度量名
 local INPUT_MEASURES = {
@@ -133,11 +134,11 @@ local function SliderText(id, v)
     return tostring(v)
 end
 
--- 滑块的主色：编辑哪个颜色就用哪个颜色画轨道填充与旋钮描边，
--- 这样一眼就能看出"我在调的是哪种颜色"。缩放滑块固定用强调色。
+-- 滑块的主色。现在只剩整体缩放一个滑块，固定用强调色。
+-- （颜色不再用滑块调，改成了 RainRGB4 取色器，见 Settings.ini 的「外观」页）
 local function SliderTint(id)
     local s = SLIDERS[id]
-    if s and s.kind == 'color' then
+    if s and s.kind == 'color' and s.var then
         return SKIN:GetVariable(s.var, '234,10,3')
     end
     return SKIN:GetVariable('ColorAccent', '234,10,3')
@@ -166,14 +167,32 @@ local function SliderValue(id)
     return Common.ClampInt(Common.ColorChannel(SKIN:GetVariable(s.var, ''), s.ch, 0), s.min, s.max, 0)
 end
 
--- 取色块
-local function SyncSwatches()
-    local accent = SKIN:GetVariable('ColorAccent', '234,10,3')
-    local text = SKIN:GetVariable('ColorText', '227,231,229')
-    SKIN:Bang('!SetOption', 'SwatchAccent', 'Shape',
-        'Rectangle 0,0,64,28,7 | StrokeWidth 1 | Stroke Color #ColorBorder# | Fill Color ' .. accent)
-    SKIN:Bang('!SetOption', 'SwatchText', 'Shape',
-        'Rectangle 0,0,64,28,7 | StrokeWidth 1 | Stroke Color #ColorBorder# | Fill Color ' .. text)
+-- 颜色：色块的填充色直接引用 #ColorAccent# / #ColorText#，
+-- 所以不需要 Lua 去画；这里只负责把值推给主皮肤。
+--
+-- 为什么要推：点击色块是 RainRGB4.exe 自己去改 Variables.inc 并刷新皮肤，
+-- Lua 根本不参与，所以没法像别的控件那样顺手 !SetVariable 给主皮肤。
+-- RainRGB4 的 RefreshConfig 只能填一个配置，我们填的是面板自己；
+-- 面板被刷新后会重新跑 Initialize()，在那里把颜色补推给主皮肤。
+local function PushColorsToMain()
+    for _, key in ipairs(COLOR_VARS) do
+        SKIN:Bang('!SetVariable', key, SKIN:GetVariable(key, ''), MAIN)
+    end
+    RenderMain()
+end
+
+-- 把 'R,G,B' 显示成 '#RRGGBB'（色块右边那串字）。
+-- ⚠ 返回值必须是纯 ASCII：Lua 字面量里的非 ASCII 字符（哪怕是 · 这种）
+--   都会被 Rainmeter 的桥接按 ANSI 重编码，显示成乱码。
+--   RGB 原始值放在色块的 ToolTipText 里（那个在 .ini 里，中文符号没事）。
+function ColorHex(key)
+    EnsureLoaded()
+    local v = tostring(SKIN:GetVariable(key, ''))
+    local r, g, b = v:match('^%s*(%d+)%s*,%s*(%d+)%s*,%s*(%d+)%s*$')
+    if not r then return v end
+    r, g, b = tonumber(r), tonumber(g), tonumber(b)
+    if r > 255 or g > 255 or b > 255 then return v end
+    return string.format('#%02X%02X%02X', r, g, b)
 end
 
 -- 目标时间六项的显示同步
@@ -203,7 +222,6 @@ local function SyncAll()
     for id in pairs(SLIDERS) do
         SyncSlider(id, SliderValue(id))
     end
-    SyncSwatches()
     SyncFields()
     SKIN:Bang('!SetOption', 'CnTitleVal', 'Text', SKIN:GetVariable('CnText', ''))
     SKIN:Bang('!SetOption', 'EnTitleVal', 'Text', SKIN:GetVariable('EnText', ''))
@@ -431,18 +449,8 @@ local function SetSlider(id, v)
         ApplyVar('ScalePercent', v)
         ApplyVar('Scale', scale)
         SyncSlider(id, v)
-    else
-        local cur = SKIN:GetVariable(s.var, '')
-        ApplyVar(s.var, Common.ColorWithChannel(cur, s.ch, v))
-        -- 同一种颜色的三个通道一起重画：轨道底色变了
-        for otherId in pairs(SLIDERS) do
-            if SLIDERS[otherId].var == s.var then
-                SyncSlider(otherId, SliderValue(otherId))
-            end
-        end
     end
 
-    SyncSwatches()
     RenderMain()
     Repaint()
 end
@@ -483,13 +491,14 @@ function ResetToDefaults()
     Repaint()
 end
 
--- ------------------------- 预览 --------------------------------------------
-
 -- ------------------------- Rainmeter 入口 ----------------------------------
 
 function Initialize()
     EnsureLoaded()
     SyncAll()
+    -- 取色器（RainRGB4）改完颜色只会刷新面板自己，主皮肤要在这里补一刀；
+    -- 平时打开面板也走这一步，等于每次都用文件里的值重新同步一次，无副作用。
+    PushColorsToMain()
     ShowPage(Common.ClampInt(SKIN:GetVariable('SettingsPage'), 1, PAGE_COUNT, 1))
     return 0
 end

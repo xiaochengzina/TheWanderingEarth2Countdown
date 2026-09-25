@@ -11,3 +11,6 @@
 .gitattributes  text eol=lf
 .gitignore      text eol=lf
 *.txt  text eol=lf
+
+# 取色器是可执行文件，按二进制存
+*.exe  binary
