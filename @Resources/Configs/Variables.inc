@@ -17,9 +17,9 @@
 [Variables]
 ; ------------------------------------------------------------ 文本内容 ------
 ; 中文主标题
-CnText=距太阳氦闪
+CnText=距太阳氦闪测试测试测试
 ; 英文主标题
-EnText=THE SOLAR HELIUM FLASH
+EnText=THE SOLAR HELIUM FLASH GO GO GO GO GO
 
 ; ------------------------------------------------------------ 目标日期 ------
 ; 倒计时归零的年 / 月 / 日
@@ -36,20 +36,20 @@ EnText=THE SOLAR HELIUM FLASH
 ;   年 / 月 / 日 → 删掉等号后面的值，或者写 0（0 年 0 月 0 日本来就不合法）
 ;   时 / 分      → 必须把值删掉；写 0 就是真的 0 点 / 0 分
 ;   秒           → 不支持留空，删掉按 0 处理
-TargetYear=2078
-TargetMonth=1
-TargetDay=1
-TargetHour=0
+TargetYear=2026
+TargetMonth=9
+TargetDay=25
+TargetHour=21
 TargetMinute=0
 TargetSecond=0
 
 ; ------------------------------------------------------------ 单位切换 ------
 ; 剩余时间低于下面的值时，数字会自动换成更小的单位（最大单位是天，没有上限）：
-;   UnitSwitchDay     剩余不足这么多「小时」 → 改用「时」
-;   UnitSwitchHour    剩余不足这么多「分钟」 → 改用「分」
+;   UnitSwitchDay     剩余不足这么多「小时」 → 改用「小时」
+;   UnitSwitchHour    剩余不足这么多「分钟」 → 改用「分钟」
 ;   UnitSwitchMinute  剩余不足这么多「秒」   → 改用「秒」
 ; 取值一律向下取整，所以阈值边界上会看到
-;   3 天 → 71 时、2 时 → 119 分、1 分 → 89 秒 这样的跳变，这是设计如此。
+;   3 天 → 71 小时、2 小时 → 119 分钟、1 分钟 → 89 秒 这样的跳变，这是设计如此。
 ; 控制面板 →「单位」页可以直接调，不用手改这里。
 UnitSwitchDay=72
 UnitSwitchHour=120
