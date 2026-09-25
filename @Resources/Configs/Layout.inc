@@ -130,13 +130,7 @@ UnitSecondEn=SECOND
 UnitSecondEnPlural=SECONDS
 
 ; ------------------------------------------------------------ 单位切换 ------
-; 剩余时间低于下面的阈值就换成更小的单位（最大单位是天，没有上限）：
-;   剩余 < 72 小时  → 换「时」
-;   剩余 < 120 分钟 → 换「分」
-;   剩余 < 90 秒    → 换「秒」
-; 数值一律向下取整，所以边界上会看到
-;   3 天 → 71 时、2 时 → 119 分、1 分 → 89 秒 这样的跳变，这是设计如此。
-; 想改手感就动这三个数。
-UnitSwitchDay=72
-UnitSwitchHour=120
-UnitSwitchMinute=90
+; 三个切换阈值是「用户设置」，已移到 Variables.inc：
+;   UnitSwitchDay / UnitSwitchHour / UnitSwitchMinute
+; 控制面板 →「单位」页可以直接调，不用改文件。
+; 这里只保留四种单位的显示文字（上面的 Unit*Cn / Unit*En）。

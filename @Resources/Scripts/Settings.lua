@@ -29,7 +29,7 @@ end
 -- 主皮肤的配置名（位于 Skins\TheWanderingEarth2Countdown）
 local MAIN = 'TheWanderingEarth2Countdown'
 
-local PAGE_COUNT = 3
+local PAGE_COUNT = 4
 local CurrentPage = 1
 
 -- ------------------------- 控件几何（必须与 Settings.ini 一致） -------------
@@ -62,6 +62,9 @@ local INPUT_MEASURES = {
     TargetHour   = 'InputTargetHour',
     TargetMinute = 'InputTargetMinute',
     TargetSecond = 'InputTargetSecond',
+    UnitSwitchDay    = 'InputUnitSwitchDay',
+    UnitSwitchHour   = 'InputUnitSwitchHour',
+    UnitSwitchMinute = 'InputUnitSwitchMinute',
 }
 
 -- 变量名 → 面板上显示该值的 String 度量名
@@ -70,20 +73,30 @@ local VALUE_METERS = {
     EnText  = 'EnTitleVal',
 }
 
--- ------------------------- 目标时间六项（与 Settings.ini 一致） -------------
+-- ------------------------- 数值字段（与 Settings.ini 一致） -----------------
 -- id      面板里的控件前缀（<id>Label / <id>Minus / <id>Val / <id>Plus）
 -- var     Variables.inc 里的键名
 -- min/max 合法范围
 -- zeroIsWild  填 0 是否等于「留空」
 -- stepWild    步进器是否会走到「循环」这一档
 --              （年只有 1970–9999 两档邻居，走不到循环，只能靠清空输入框）
+-- noWild      不允许留空（单位阈值就是这种）；值不合法时显示 def
+-- def         上面那种情况的兜底显示值
 local FIELDS = {
+    -- 目标时间（控制面板第 1 页）
     { id = 'Year',  var = 'TargetYear',   min = 1970, max = 9999, zeroIsWild = true,  stepWild = false },
     { id = 'Month', var = 'TargetMonth',  min = 1,    max = 12,   zeroIsWild = true,  stepWild = true },
     { id = 'Day',   var = 'TargetDay',    min = 1,    max = 31,   zeroIsWild = true,  stepWild = true },
     { id = 'Hour',  var = 'TargetHour',   min = 0,    max = 23,   zeroIsWild = false, stepWild = true },
     { id = 'Min',   var = 'TargetMinute', min = 0,    max = 59,   zeroIsWild = false, stepWild = true },
     { id = 'Sec',   var = 'TargetSecond', min = 0,    max = 59,   zeroIsWild = false, stepWild = false },
+
+    -- 单位切换阈值（控制面板第 3 页「单位」）
+    -- 下限都取「刚好还能显示出 1 个该单位」的值，否则会出现「0 天」这种显示
+    --（例：天阈值若小于 24 小时，剩余 20 小时时会显示 0 天）
+    { id = 'UnitDay',    var = 'UnitSwitchDay',    min = 24, max = 8760,  zeroIsWild = false, stepWild = false, noWild = true, def = 72 },
+    { id = 'UnitHour',   var = 'UnitSwitchHour',   min = 60, max = 10080, zeroIsWild = false, stepWild = false, noWild = true, def = 120 },
+    { id = 'UnitMinute', var = 'UnitSwitchMinute', min = 60, max = 3600,  zeroIsWild = false, stepWild = false, noWild = true, def = 90 },
 }
 
 local FIELD_BY_ID = {}
@@ -101,6 +114,9 @@ local DEFAULTS = {
     { 'TargetHour',   'DefTargetHour' },
     { 'TargetMinute', 'DefTargetMinute' },
     { 'TargetSecond', 'DefTargetSecond' },
+    { 'UnitSwitchDay',    'DefUnitSwitchDay' },
+    { 'UnitSwitchHour',   'DefUnitSwitchHour' },
+    { 'UnitSwitchMinute', 'DefUnitSwitchMinute' },
     { 'Scale',        'DefScale' },
     { 'ScalePercent', 'DefScalePercent' },
     { 'ColorAccent',  'DefColorAccent' },
@@ -181,6 +197,16 @@ local function PushColorsToMain()
     RenderMain()
 end
 
+-- 把「剩余多少秒」按当前阈值换算成显示文字（例：'71时'），
+-- 用于「单位」页底部的实时示例。数字是 ASCII、单位字从 Layout.inc 读，
+-- 拼出来是安全的（见 Common.lua 顶部关于 Lua 中文的说明）。
+function UnitOf(sec)
+    EnsureLoaded()
+    local cn = { 'UnitDayCn', 'UnitHourCn', 'UnitMinuteCn', 'UnitSecondCn' }
+    local idx, n = Common.PickUnit(tonumber(sec) or 0)
+    return tostring(n) .. SKIN:GetVariable(cn[idx], '')
+end
+
 -- 把 'R,G,B' 显示成 '#RRGGBB'（色块右边那串字）。
 -- ⚠ 返回值必须是纯 ASCII：Lua 字面量里的非 ASCII 字符（哪怕是 · 这种）
 --   都会被 Rainmeter 的桥接按 ANSI 重编码，显示成乱码。
@@ -195,8 +221,9 @@ function ColorHex(key)
     return string.format('#%02X%02X%02X', r, g, b)
 end
 
--- 目标时间六项的显示同步
--- 值为空（留空）时显示「循环」并压暗；否则显示数字
+-- 数值字段的显示同步
+-- 目标时间：值为空（留空）时显示「循环」并压暗；否则显示数字
+-- 单位阈值：不允许留空，值不合法就显示兜底值 def
 local function SyncFields()
     for _, f in ipairs(FIELDS) do
         local raw = tostring(SKIN:GetVariable(f.var) or ''):match('^%s*(.-)%s*$')
@@ -204,6 +231,8 @@ local function SyncFields()
         local n = tonumber(raw)
         -- 越界值按留空显示，和主皮肤的判定保持一致
         if not isWild and (n == nil or n < f.min or n > f.max) then isWild = true end
+        -- 不允许留空的字段（单位阈值）：退回兜底值，永远显示一个数字
+        if isWild and f.noWild then isWild = false; n = f.def end
 
         if isWild then
             -- 「循环」两个字从 Settings.ini 的变量读：Lua 里写中文字面量会被

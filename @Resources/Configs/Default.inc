@@ -30,6 +30,12 @@ DefTargetHour=0
 DefTargetMinute=0
 DefTargetSecond=0
 
+; ------------------------------------------------------------ 单位切换 ------
+; 阈值规则见 Variables.inc 顶部说明
+DefUnitSwitchDay=72
+DefUnitSwitchHour=120
+DefUnitSwitchMinute=90
+
 ; ------------------------------------------------------------ 外观 ----------
 DefScale=1.00
 DefScalePercent=100
