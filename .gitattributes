@@ -1,0 +1,13 @@
+# 皮肤文件（CountDown.ini / Settings.ini / *.inc）是 UTF-16 LE + BOM。
+# 必须当二进制处理：git 一旦做行尾转换就会把编码弄坏，皮肤随即变成一片空白。
+*.ini  -text
+*.inc  -text
+
+# 脚本与文档是 UTF-8，统一用 LF，跨平台一致
+*.lua  text eol=lf
+*.md   text eol=lf
+
+# 仓库自身的配置文件
+.gitattributes  text eol=lf
+.gitignore      text eol=lf
+*.txt  text eol=lf

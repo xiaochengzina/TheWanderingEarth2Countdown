@@ -1,0 +1,17 @@
+# Windows / 编辑器垃圾
+Thumbs.db
+desktop.ini
+.DS_Store
+*.tmp
+*.bak
+*~
+
+# 打包产物
+*.rmskin
+
+# 本地调试文件
+debug.txt
+
+# 字体是第三方商业字库，不随仓库分发；只保留一份说明
+@Resources/Fonts/*
+!@Resources/Fonts/字体说明.txt

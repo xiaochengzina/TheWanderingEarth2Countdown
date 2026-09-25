@@ -1,0 +1,11 @@
+把字体文件（.ttf / .otf）放进这个文件夹即可，Rainmeter 会自动加载，
+不需要安装到系统。
+
+皮肤用到两种字体，都在 @Resources\Configs\Layout.inc 里指定，可以自由替换：
+
+    FontCn     中文标题
+    FontEn     英文两行
+    FontDays   大号数字（默认与 FontEn 同款）
+
+本项目仓库里不包含字体文件，请自行准备；
+换字体后如果发现大号数字被裁切，按 README 的常见问题调一下 DaysY 即可。
