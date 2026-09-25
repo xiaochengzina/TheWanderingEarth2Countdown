@@ -366,36 +366,44 @@ local function FieldValue(f)
     return n
 end
 
--- 把「不能跳级」链条理顺：通配只能是从「年」开始的一段连续前缀。
--- 改完之后再写用户点的那个字段，保证任何时刻配置都是合法的。
---   value 为空（要设成循环）→ 把它**前面**的字段统统也设成循环
---     （「日任意」本来就蕴含「月任意、年任意」，否则得到的是
---       「某年某月的任意一天」，正是要禁掉的跳级组合）
---   value 是数字（要设成具体值）→ 把它**后面**还处于循环的字段落到最小值
---     （年一旦固定，后面的月/日/时/分就不能再任意了）
+-- 「不能跳级」的前置检查：只有排在前面的字段**都**是循环，这一项才能循环。
+-- 「年」排在第一个，没有任何前置，所以它永远可以。
+local function CanBeWild(id)
+    for _, k in ipairs(TARGET_CHAIN) do
+        if k == id then return true end        -- 走到自己，说明前面的都通过了
+        local g = FIELD_BY_ID[k]
+        if not g or FieldValue(g) ~= nil then return false end
+    end
+    return false                                -- id 不在目标链条里（单位阈值那种）
+end
+
+-- 「不能跳级」的向下收敛：设成具体值时，把它**后面**还处于循环的字段落到最小值
+--（年一旦固定，后面的月/日/时/分就不能再任意了）。
+--
+-- ⚠ 向上**没有**自动补位 —— 那是硬门禁：前置没满足就直接拒绝，
+--   让用户自己一级一级开（见 StepField / ApplyField）。
+--   方向之所以不对称：向上的自动补位会把用户没碰的字段一起清成循环，
+--   全填时清空「分」会一次抹掉五个字段，跨度太大（作者否掉了这个做法）。
 local function FixChain(id, toWild)
+    if toWild then return end                   -- 向上交给门禁，不自动补
     local at = nil
     for i, k in ipairs(TARGET_CHAIN) do
         if k == id then at = i break end
     end
-    if at == nil then return end      -- 单位阈值那几个字段不在链条里
+    if at == nil then return end
 
-    if toWild then
-        for i = 1, at - 1 do
-            local g = FIELD_BY_ID[TARGET_CHAIN[i]]
-            if g and FieldValue(g) ~= nil then ApplyVar(g.var, '') end
-        end
-    else
-        for i = at + 1, #TARGET_CHAIN do
-            local g = FIELD_BY_ID[TARGET_CHAIN[i]]
-            if g and FieldValue(g) == nil then ApplyVar(g.var, tostring(g.min)) end
-        end
+    for i = at + 1, #TARGET_CHAIN do
+        local g = FIELD_BY_ID[TARGET_CHAIN[i]]
+        if g and FieldValue(g) == nil then ApplyVar(g.var, tostring(g.min)) end
     end
 end
 
 -- 写回某一项；value 为 nil / '' 表示留空
 local function ApplyField(f, value)
     local toWild = (value == nil or value == '')
+    -- 门禁的第二道保险（第一道在 StepField / SetFieldValue，那里还要决定
+    -- 「跳过」还是「不生效」）。这里挡住任何漏网的留空请求。
+    if toWild and not CanBeWild(f.id) then return end
     FixChain(f.id, toWild)
     if toWild then
         ApplyVar(f.var, '')
@@ -424,9 +432,15 @@ function StepField(id, delta)
     else
         nextVal = cur + delta
         if f.stepWild then
-            -- 在「循环」与数值之间成环
-            if nextVal > f.max then nextVal = nil
-            elseif nextVal < f.min then nextVal = nil end
+            -- 在「循环」与数值之间成环。
+            -- 「不能跳级」是硬门禁：前置没满足时**跳过「循环」这一档**，
+            -- 直接绕到另一端（最大值→最小值、最小值→最大值），
+            -- 而不是替用户把前面的字段也改成循环。
+            if nextVal > f.max then
+                nextVal = CanBeWild(id) and nil or f.min
+            elseif nextVal < f.min then
+                nextVal = CanBeWild(id) and nil or f.max
+            end
             if nextVal == nil then
                 -- 走到「循环」这一档；再按一次往回走就落到另一端
                 ApplyField(f, nil)
@@ -449,6 +463,9 @@ function StepField(id, delta)
 end
 
 -- 输入框提交：空 → 留空；数字 → 该值（年/月/日 的 0 也算留空）
+--
+-- 「不能跳级」在这里是硬门禁：前置没满足时**清空不生效**（什么都不做，
+-- 字段保持原值），用户得先按顺序把前面的字段也清空。
 function SetFieldValue(id, raw)
     EnsureLoaded()
     local f = FIELD_BY_ID[id]
@@ -461,7 +478,7 @@ function SetFieldValue(id, raw)
         if f.noWild then
             ApplyField(f, f.def)
         else
-            ApplyField(f, nil)
+            ApplyField(f, nil)          -- ApplyField 里有门禁，前置不满足会自动拒绝
         end
         return
     end
@@ -470,6 +487,7 @@ function SetFieldValue(id, raw)
     if n == nil then return end
     n = math.floor(n)
     if f.zeroIsWild and n == 0 then
+        -- 年/月/日 填 0 也算留空，同样要过门禁
         ApplyField(f, nil)
         return
     end
