@@ -102,6 +102,23 @@ local FIELDS = {
 local FIELD_BY_ID = {}
 for _, f in ipairs(FIELDS) do FIELD_BY_ID[f.id] = f end
 
+-- 「不能跳级」规则 ------------------------------------------------------------
+--
+-- 目标时间的通配（留空 = 循环）**只能是从「年」开始的一段连续前缀**：
+--     六项全填      → 只触发一次
+--     年循环        → 每年
+--     年+月循环     → 每月
+--     年+月+日循环  → 每天
+--     年+月+日+时循环 → 每小时
+--     六项里前五项都循环 → 每分钟
+-- 不允许「年固定 + 月循环」这种跳级组合 —— 语义上等于「某个年份里的每个月」，
+-- 用户很难看懂，作者明确要求禁掉。
+--
+-- 落地方式（两处一起保证，UI 和皮肤不会打架）：
+--   1. 面板：ApplyField 改一个字段时顺手把链条理顺（见下）
+--   2. 皮肤：Common.TargetSpec 读配置时再把前缀补一遍（防手改配置文件）
+TARGET_CHAIN = { 'Year', 'Month', 'Day', 'Hour', 'Min' }
+
 -- 恢复默认：用户设置键名 → Default.inc 里的 Def* 键名
 -- 值一律通过 "#DefXxx#" 交给 Rainmeter 自己展开，不经过 Lua，
 -- 否则中文会被 Lua 桥接按 ANSI 重新编码而变成乱码。
@@ -225,6 +242,8 @@ end
 -- 目标时间：值为空（留空）时显示「循环」并压暗；否则显示数字
 -- 单位阈值：不允许留空，值不合法就显示兜底值 def
 local function SyncFields()
+    -- 第一遍：算出每一项的状态
+    local st = {}
     for _, f in ipairs(FIELDS) do
         local raw = tostring(SKIN:GetVariable(f.var) or ''):match('^%s*(.-)%s*$')
         local isWild = (raw == '') or (f.zeroIsWild and tonumber(raw) == 0)
@@ -233,14 +252,29 @@ local function SyncFields()
         if not isWild and (n == nil or n < f.min or n > f.max) then isWild = true end
         -- 不允许留空的字段（单位阈值）：退回兜底值，永远显示一个数字
             if isWild and f.noWild then isWild = false; n = f.def or f.min end
+        st[f.id] = { wild = isWild, n = n }
+    end
 
-        if isWild then
+    -- 「不能跳级」：目标字段里靠后的项是循环，前面的项也要按循环显示。
+    -- 口径必须和主皮肤 Common.TargetSpec 完全一致，否则手改配置文件后会出现
+    -- 「字段框写着 2026、下面的预览却说每月」这种同屏自相矛盾。
+    for i = #TARGET_CHAIN, 2, -1 do
+        if st[TARGET_CHAIN[i]] and st[TARGET_CHAIN[i]].wild then
+            local g = st[TARGET_CHAIN[i - 1]]
+            if g then g.wild = true end
+        end
+    end
+
+    -- 第二遍：输出到界面
+    for _, f in ipairs(FIELDS) do
+        local s = st[f.id]
+        if s.wild then
             -- 「循环」两个字从 Settings.ini 的变量读：Lua 里写中文字面量会被
             -- 桥接按 ANSI 重编码成乱码（见 Common.lua 顶部说明）
             SKIN:Bang('!SetOption', f.id .. 'Val', 'Text', SKIN:GetVariable('WildText', ''))
             SKIN:Bang('!SetOption', f.id .. 'Val', 'FontColor', '#ColorHint#')
         else
-            SKIN:Bang('!SetOption', f.id .. 'Val', 'Text', tostring(math.floor(n)))
+            SKIN:Bang('!SetOption', f.id .. 'Val', 'Text', tostring(math.floor(s.n)))
             SKIN:Bang('!SetOption', f.id .. 'Val', 'FontColor', '#UiText#')
         end
     end
@@ -332,9 +366,38 @@ local function FieldValue(f)
     return n
 end
 
+-- 把「不能跳级」链条理顺：通配只能是从「年」开始的一段连续前缀。
+-- 改完之后再写用户点的那个字段，保证任何时刻配置都是合法的。
+--   value 为空（要设成循环）→ 把它**前面**的字段统统也设成循环
+--     （「日任意」本来就蕴含「月任意、年任意」，否则得到的是
+--       「某年某月的任意一天」，正是要禁掉的跳级组合）
+--   value 是数字（要设成具体值）→ 把它**后面**还处于循环的字段落到最小值
+--     （年一旦固定，后面的月/日/时/分就不能再任意了）
+local function FixChain(id, toWild)
+    local at = nil
+    for i, k in ipairs(TARGET_CHAIN) do
+        if k == id then at = i break end
+    end
+    if at == nil then return end      -- 单位阈值那几个字段不在链条里
+
+    if toWild then
+        for i = 1, at - 1 do
+            local g = FIELD_BY_ID[TARGET_CHAIN[i]]
+            if g and FieldValue(g) ~= nil then ApplyVar(g.var, '') end
+        end
+    else
+        for i = at + 1, #TARGET_CHAIN do
+            local g = FIELD_BY_ID[TARGET_CHAIN[i]]
+            if g and FieldValue(g) == nil then ApplyVar(g.var, tostring(g.min)) end
+        end
+    end
+end
+
 -- 写回某一项；value 为 nil / '' 表示留空
 local function ApplyField(f, value)
-    if value == nil or value == '' then
+    local toWild = (value == nil or value == '')
+    FixChain(f.id, toWild)
+    if toWild then
         ApplyVar(f.var, '')
     else
         ApplyVar(f.var, tostring(math.floor(value)))

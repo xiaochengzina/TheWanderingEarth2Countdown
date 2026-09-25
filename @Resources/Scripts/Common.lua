@@ -155,11 +155,19 @@ local function ReadField(key, zeroIsWild, min, max)
 end
 
 -- 读取当前目标模式
+--
+-- ⚠ 「不能跳级」：通配（留空 = 循环）只能是从「年」开始的一段连续前缀。
+--   面板侧会联动保证（见 Settings.lua 的 FixChain），这里再补一遍 ——
+--   用户可以直接用记事本改 Variables.inc，那样就绕过了面板。
+--   不补的话会出现「年固定 + 月循环」这种组合，语义是「某个年份里的每个月」，
+--   作者明确要求禁掉（用户很难看懂）。
+--   处理方式是**把前面也当成通配**（而不是把后面的通配取消）：
+--   余下的含义是「更频繁地重复」，比「悄悄换成某个具体月日」安全。
 function Common.TargetSpec()
     local second = math.floor(tonumber(tostring(SKIN:GetVariable('TargetSecond') or '')) or 0)
     if second < 0 or second > 59 then second = 0 end
 
-    return {
+    local sp = {
         year   = ReadField('TargetYear',   true,  1970, YEAR_MAX),
         month  = ReadField('TargetMonth',  true,  1, 12),
         day    = ReadField('TargetDay',    true,  1, 31),
@@ -167,6 +175,14 @@ function Common.TargetSpec()
         minute = ReadField('TargetMinute', false, 0, 59),
         second = second,
     }
+
+    -- 从链条末端往前推：任一项是通配，它前面所有项也必须是通配
+    if sp.minute == nil then sp.hour   = nil end
+    if sp.hour   == nil then sp.day    = nil end
+    if sp.day    == nil then sp.month  = nil end
+    if sp.month  == nil then sp.year   = nil end
+
+    return sp
 end
 
 -- 在某一天的 时 / 分 里找第一个 >= now 的时刻；找不到返回 nil
