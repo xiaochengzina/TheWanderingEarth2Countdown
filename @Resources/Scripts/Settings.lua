@@ -11,7 +11,7 @@
 --   SliderJump(id, pct)             滑块：按轨道百分比定位
 --   SliderStep(id, delta)           滑块：步进
 --   ResetToDefaults()               恢复出厂设置
---   PreviewPattern/Next/Remain()    第 1 页的实时预览文字
+--   PreviewLoopLine/Next/Remain()   第 1 页的实时预览文字
 --
 -- 生效模型（ApplyVar）：
 --   写 Variables.inc → !SetVariable 同步面板 → !SetVariable 同步主皮肤
@@ -485,23 +485,53 @@ end
 --         中文文字全部来自 .ini 变量，用 SKIN:GetVariable 读出来再传回去
 --         （那是原样往返，不会坏）。中文标签放在 Settings.ini 的 [Variables]。
 
--- 重复周期标签：读 Settings.ini 里的 Repeat<Key> 变量
-local function RepeatLabel()
-    local key = Common.TargetRepeatKey(Common.TargetSpec())
-    return SKIN:GetVariable('Repeat' .. key:sub(1, 1):upper() .. key:sub(2), '')
-end
-
--- 重复周期标签（中文，值来自 Settings.ini 的 Repeat<Key> 变量）
-function PreviewRepeat()
+-- 预览那行：用一句大白话说清「什么时候执行一次」
+--
+-- 通配的第一个字段决定粒度（「不能跳级」保证了通配一定是连续前缀）：
+--   全填             → 2026年12月31日 23:59:59 只执行一次
+--   年通配           → 每年的 12月31日 23:59:59 执行一次循环
+--   年+月通配        → 每月的 31日 23:59:59 执行一次循环
+--   年+月+日通配     → 每日的 23:59:59 执行一次循环
+--   年+月+日+时通配  → 每小时的第 59 分钟执行一次循环
+--   前五项全通配     → 每分钟的第 30 秒执行一次循环
+--
+-- 中文全从 Settings.ini 的 Pv* 变量读（Lua 里拼中文字面量会变乱码，见文件头）。
+function PreviewLoopLine()
     EnsureLoaded()
-    return RepeatLabel()
-end
+    local sp = Common.TargetSpec()
 
--- 目标模式（纯 ASCII）：'*-10-29 16:30:00'
--- 分隔符由 meter 那边拼，Lua 里一个非 ASCII 字符都不能有
-function PreviewPattern()
-    EnsureLoaded()
-    return Common.TargetPattern(Common.TargetSpec())
+    -- 数一数开头连续有几个通配：0 = 一次性，1 = 每年，…，5 = 每分钟
+    local n = 0
+    for _, k in ipairs({ 'year', 'month', 'day', 'hour', 'minute' }) do
+        if sp[k] == nil then n = n + 1 else break end
+    end
+
+    local V = function(key) return SKIN:GetVariable(key, '') end
+    -- 后缀前的空格在这里加：ini 值的前导空格会被 Rainmeter 吃掉
+    local suffix = ' ' .. V('PvLoopSuffix')
+    local hms = string.format('%d:%02d:%02d', sp.hour or 0, sp.minute or 0, sp.second)
+
+    if n == 0 then
+        return string.format('%d%s%d%s%d%s %s%s',
+            sp.year, V('PvYUnit'), sp.month, V('PvMUnit'), sp.day, V('PvDUnit'),
+            hms, ' ' .. V('PvOnceSuffix'))
+    elseif n == 1 then
+        return V('PvYearly') .. string.format(' %d%s%d%s %s',
+            sp.month, V('PvMUnit'), sp.day, V('PvDUnit'), hms) .. suffix
+    elseif n == 2 then
+        return V('PvMonthly') .. string.format(' %d%s %s', sp.day, V('PvDUnit'), hms) .. suffix
+    elseif n == 3 then
+        return V('PvDaily') .. ' ' .. hms .. suffix
+    elseif n == 4 then
+        -- 秒为 0 时省略，读起来更顺（「每小时的第 15 分钟」）
+        local s = V('PvHourly') .. string.format(' %d%s', sp.minute, V('PvMinUnit'))
+        if sp.second ~= 0 then
+            s = s .. string.format(' %d%s', sp.second, V('PvSecUnit'))
+        end
+        return s .. suffix
+    else
+        return V('PvMinutely') .. string.format(' %d%s', sp.second, V('PvSecUnit')) .. suffix
+    end
 end
 
 -- 下一次匹配：有匹配就返回「下一次：<时刻>」，没有就返回中文兜底句

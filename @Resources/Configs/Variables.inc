@@ -38,11 +38,11 @@ EnText=THE SOLAR HELIUM FLASH GO
 ;   时 / 分      → 必须把值删掉；写 0 就是真的 0 点 / 0 分
 ;   秒           → 不支持留空，删掉按 0 处理
 TargetYear=
-TargetMonth=1
-TargetDay=31
-TargetHour=0
-TargetMinute=0
-TargetSecond=50
+TargetMonth=
+TargetDay=
+TargetHour=
+TargetMinute=1
+TargetSecond=49
 
 ; ------------------------------------------------------------ 单位切换 ------
 ; 剩余时间低于下面的值时，数字会自动换成更小的单位（最大单位是天，没有上限）：
@@ -70,4 +70,4 @@ ColorText=227,231,229
 ; 面板当前停留的页码（1 内容 / 2 外观 / 3 单位 / 4 高级），由面板自动维护。
 ; 面板**开着的期间**会停在你翻到的那一页（取色器改完颜色会刷新面板，
 ; 也仍然停在原页）；点右上角关闭时会被写回 1，所以下次打开还是内容页。
-SettingsPage=1
+SettingsPage=4
