@@ -57,6 +57,19 @@ DaysSpacing=-4.32
 
 ; ------------------------------------------------------- 中文标题「距太阳氦闪」
 ; 设计稿 ink 位置：x38..461, y26..104
+;
+; TitleMaxW = 标题刚好占满设计稿宽度时，meter 的排版宽度（W）。
+; 注意它不是 ink 宽度：ink 只有 423px，而 meter 的 W 还含左右边距，实测 438。
+; 标题超过这个宽度后，右边整块（红条 / 还剩 / 数字 / 英文）会整体右移
+; 「超出多少就移多少」，字号和内部对齐完全不变；窗口靠 DynamicWindowSize 自动加宽。
+; 实现见 CountDown.ini 里那几处 [MeterCnText:W] 的公式。
+;
+; ⚠ 这个值是量出来的，和 CnFontSize / CnSpacing 绑在一起。改了 CnFontSize 之后
+;   要重新标定：把标题设回 5 个字，读 [MeterCnText:W] 的值填回来。
+;   读法：临时加一个可见的 String meter 显示 [MeterCnText:W]
+;   （别用 Hidden=1 的 meter 去量，隐藏 meter 的 W 恒为 0）。
+TitleMaxW=438
+
 TitleX=33.3
 TitleY=15.3
 
