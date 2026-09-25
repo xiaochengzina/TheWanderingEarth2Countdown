@@ -262,12 +262,13 @@ function ShowPage(n)
     EnsureLoaded()
     n = Common.ClampInt(n, 1, PAGE_COUNT, 1)
     CurrentPage = n
-    -- ⚠ 这里**不写回** SettingsPage。
-    --   SettingsPage 现在是「面板首页」而不是「上次停留的页」：
-    --   打开面板永远从它指定的那一页开始（出厂值 1 = 内容页），
-    --   在面板里翻到别的页不会改动它，下次打开还是首页。
-    --   （以前是「记住上次停留的页」，作者要求改成固定首页。）
-    SKIN:Bang('!SetVariable', 'SettingsPage', tostring(n))
+    -- ⚠ 这里**不碰** SettingsPage —— 既不写文件，也不 !SetVariable。
+    --   SettingsPage 是「面板首页」而不是「当前页」：
+    --   打开面板（和「恢复默认设置」之后）都从它指定的那一页开始，
+    --   在面板里翻页不会改动它。
+    --   坑：一开始只删了写文件那句、留着 !SetVariable，结果翻到第 4 页后
+    --   皮肤变量也变成了 '4'，ResetToDefaults 读它就把用户送回了高级页。
+    --   「当前页」只存在于 Lua 的 CurrentPage 里，不对外暴露。
     for i = 1, PAGE_COUNT do
         SKIN:Bang(i == n and '!ShowMeterGroup' or '!HideMeterGroup', 'Page' .. i)
         SKIN:Bang('!SetOption', 'NavBg' .. i, 'MeterStyle', i == n and 'NavBgOnStyle' or 'NavBgOffStyle')
@@ -534,6 +535,11 @@ function ResetToDefaults()
     SyncAll()
     RenderMain()
     Repaint()
+    -- 恢复完回首页。
+    -- 「恢复默认设置」的按钮在「高级」页，但被重置的东西（标题、目标时间、
+    -- 配色、缩放、单位阈值）几乎都在首页和它后面的页上；停在高级页的话
+    -- 用户看不出到底改了什么，体感像「点了没反应」。
+    ShowPage(Common.ClampInt(SKIN:GetVariable('SettingsPage'), 1, PAGE_COUNT, 1))
 end
 
 -- ------------------------- Rainmeter 入口 ----------------------------------
