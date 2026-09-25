@@ -461,7 +461,7 @@ function PreviewRemainEn()
     local idx, n = RemainParts()
     local en = { 'UnitDayEn', 'UnitHourEn', 'UnitMinuteEn', 'UnitSecondEn' }
     local enp = { 'UnitDayEnPlural', 'UnitHourEnPlural', 'UnitMinuteEnPlural', 'UnitSecondEnPlural' }
-    local key = (n == 1) and en[idx] or enp[idx]
+    local key = (n <= 1) and en[idx] or enp[idx]   -- 0 和 1 都用单数
     return string.format('%s %d %s',
         SKIN:GetVariable('EnDaysPrefix', 'IN'), n, SKIN:GetVariable(key, ''))
 end

@@ -80,16 +80,17 @@ function UnitCn()
 end
 
 -- 英文单位（按单复数自动选）
+-- 单数规则：n <= 1 用单数 —— 也就是 0 和 1 都不加 s（作者要求）
 function UnitEn()
     local idx, n = Unit()
-    local key = (n == 1) and UNIT_EN[idx] or UNIT_ENP[idx]
+    local key = (n <= 1) and UNIT_EN[idx] or UNIT_ENP[idx]
     return Var(key, '')
 end
 
--- 英文整行：IN 71 HOURS
+-- 英文整行：IN 71 HOURS / IN 1 DAY / IN 0 SECOND
 function EnLine()
     local idx, n = Unit()
-    local key = (n == 1) and UNIT_EN[idx] or UNIT_ENP[idx]
+    local key = (n <= 1) and UNIT_EN[idx] or UNIT_ENP[idx]
     return string.format('%s %d %s', Var('EnDaysPrefix', 'IN'), n, Var(key, ''))
 end
 

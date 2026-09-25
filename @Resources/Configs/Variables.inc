@@ -17,9 +17,9 @@
 [Variables]
 ; ------------------------------------------------------------ 文本内容 ------
 ; 中文主标题
-CnText=距太阳氦闪测试测试测试
+CnText=距太阳氦闪
 ; 英文主标题
-EnText=THE SOLAR HELIUM FLASH GO GO GO GO GO
+EnText=THE SOLAR HELIUM FLASH
 
 ; ------------------------------------------------------------ 目标日期 ------
 ; 倒计时归零的年 / 月 / 日
@@ -39,8 +39,8 @@ EnText=THE SOLAR HELIUM FLASH GO GO GO GO GO
 TargetYear=2026
 TargetMonth=9
 TargetDay=25
-TargetHour=21
-TargetMinute=0
+TargetHour=19
+TargetMinute=47
 TargetSecond=0
 
 ; ------------------------------------------------------------ 单位切换 ------
@@ -61,9 +61,9 @@ Scale=1.00
 ; 整体缩放百分比（40 - 200）
 ScalePercent=100
 ; 强调色：红色竖条 + 大号天数
-ColorAccent=234,10,3
+ColorAccent=44,151,245
 ; 正文色：中文标题 / 英文两行
-ColorText=227,231,229
+ColorText=26,196,111
 
 ; ------------------------------------------------------------ 面板状态 ------
 ; 控制面板上次停留的页码（由面板自动写入，不用手改）
