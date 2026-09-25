@@ -184,6 +184,12 @@ A：`Layout.inc` 里的 `DaysFontSize` 和 `DaysY` 必须一起改，
 
 A：数值是**向下取整**的（`floor`），不是「不足一天算一天」。
 
+**Q：拖动皮肤时只有文字上能拖，空白处点不动。**
+
+A：Rainmeter 皮肤是分层窗口，**完全透明（alpha = 0）的像素不接收鼠标**，
+所以只有文字笔画能拖。主皮肤最底层铺了一层「看不见但 alpha = 1」的
+`MeterDragLayer` 盖住整个窗口，现在窗口里任意位置都能按住拖动。
+
 **Q：面板里改了设置，主皮肤没反应。**
 
 A：面板靠配置名 `TheWanderingEarth2Countdown` 找主皮肤，
