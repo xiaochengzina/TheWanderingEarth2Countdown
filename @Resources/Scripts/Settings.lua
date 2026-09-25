@@ -262,13 +262,15 @@ function ShowPage(n)
     EnsureLoaded()
     n = Common.ClampInt(n, 1, PAGE_COUNT, 1)
     CurrentPage = n
-    -- ⚠ 这里**不碰** SettingsPage —— 既不写文件，也不 !SetVariable。
-    --   SettingsPage 是「面板首页」而不是「当前页」：
-    --   打开面板（和「恢复默认设置」之后）都从它指定的那一页开始，
-    --   在面板里翻页不会改动它。
-    --   坑：一开始只删了写文件那句、留着 !SetVariable，结果翻到第 4 页后
-    --   皮肤变量也变成了 '4'，ResetToDefaults 读它就把用户送回了高级页。
-    --   「当前页」只存在于 Lua 的 CurrentPage 里，不对外暴露。
+    -- 记住当前页（只在真的变了才写文件）。
+    -- 为什么必须记：取色器 RainRGB4 改完颜色会 !Refresh 面板自己
+    --（色块要重新读 Variables.inc 才能变色），刷新会重跑 Initialize。
+    -- 不记的话，用户挑完颜色就被弹回首页，「改颜色」这个动作等于把人赶走。
+    -- 「打开面板回首页」靠 ClosePanel()：关闭时把页码写回 1。
+    if tostring(SKIN:GetVariable('SettingsPage', '')) ~= tostring(n) then
+        Common.WriteVar('SettingsPage', n)
+    end
+    SKIN:Bang('!SetVariable', 'SettingsPage', tostring(n))
     for i = 1, PAGE_COUNT do
         SKIN:Bang(i == n and '!ShowMeterGroup' or '!HideMeterGroup', 'Page' .. i)
         SKIN:Bang('!SetOption', 'NavBg' .. i, 'MeterStyle', i == n and 'NavBgOnStyle' or 'NavBgOffStyle')
@@ -535,11 +537,23 @@ function ResetToDefaults()
     SyncAll()
     RenderMain()
     Repaint()
-    -- 恢复完回首页。
+    -- 恢复完回首页（第 1 页 = 内容）。
     -- 「恢复默认设置」的按钮在「高级」页，但被重置的东西（标题、目标时间、
     -- 配色、缩放、单位阈值）几乎都在首页和它后面的页上；停在高级页的话
     -- 用户看不出到底改了什么，体感像「点了没反应」。
-    ShowPage(Common.ClampInt(SKIN:GetVariable('SettingsPage'), 1, PAGE_COUNT, 1))
+    ShowPage(1)
+end
+
+-- 关闭面板：把页码写回首页再卸载。
+-- 于是「打开面板」永远是内容页；而面板开着的期间（含取色器触发的
+-- !Refresh）会停在你正在看的页，不会把人弹走。
+function ClosePanel()
+    EnsureLoaded()
+    if tostring(SKIN:GetVariable('SettingsPage', '')) ~= '1' then
+        Common.WriteVar('SettingsPage', 1)
+    end
+    SKIN:Bang('!DeactivateConfig')
+    return 0
 end
 
 -- ------------------------- Rainmeter 入口 ----------------------------------
@@ -550,8 +564,10 @@ function Initialize()
     -- 取色器（RainRGB4）改完颜色只会刷新面板自己，主皮肤要在这里补一刀；
     -- 平时打开面板也走这一步，等于每次都用文件里的值重新同步一次，无副作用。
     PushColorsToMain()
-    -- 打开面板永远从「首页」开始。SettingsPage 是配置里的首页页码
-    --（出厂 1 = 内容页），不是上次停留的页 —— ShowPage 不会改写它。
+    -- 打开面板时停在上次停留的页（SettingsPage 由 ShowPage 维护）。
+    -- 之所以不是「永远回首页」：取色器改完颜色会 !Refresh 面板，刷新会
+    -- 重跑这里，永远回首页的话用户挑完色就被弹走了。
+    -- 「打开面板回首页」由 ClosePanel() 保证：关闭时把页码写回 1。
     -- 取不到值或越界时退回第 1 页（内容）。
     ShowPage(Common.ClampInt(SKIN:GetVariable('SettingsPage'), 1, PAGE_COUNT, 1))
     return 0
