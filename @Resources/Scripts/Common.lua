@@ -111,8 +111,10 @@ function Common.DaysLeft(year, month, day)
     day = math.min(day, Common.DaysInMonth(year, month))
 
     -- os.time 的字段名是 min / sec
+    -- ⚠ 远年份会返回 nil，见 FindTimeOnDay 的说明
     local target = os.time({ year = year, month = month, day = day,
                              hour = 0, min = 0, sec = 0 })
+    if target == nil then return 0 end
     local diff = target - os.time()
     local left = math.floor(diff / 86400)
     if left < 0 then return 0 end
@@ -120,6 +122,12 @@ function Common.DaysLeft(year, month, day)
 end
 
 -- ============================================================================
+-- os.time 能表示的最大年份。
+-- Windows 的 C 运行时在 3000 年前后就会让 os.time 返回 nil，
+-- 所以年份字段的上限用它，而不是看起来更漂亮的 9999。
+-- 代码里凡是 os.time 的结果仍然都会判 nil（用户可以手改配置文件绕过面板）。
+local YEAR_MAX = 3000
+
 -- 目标模式（倒计时核心）
 --
 -- 目标不是「一个时刻」而是「一个模式」：年 / 月 / 日 / 时 / 分 都可以留空，
@@ -152,7 +160,7 @@ function Common.TargetSpec()
     if second < 0 or second > 59 then second = 0 end
 
     return {
-        year   = ReadField('TargetYear',   true,  1970, 9999),
+        year   = ReadField('TargetYear',   true,  1970, YEAR_MAX),
         month  = ReadField('TargetMonth',  true,  1, 12),
         day    = ReadField('TargetDay',    true,  1, 31),
         hour   = ReadField('TargetHour',   false, 0, 23),
@@ -166,8 +174,15 @@ end
 --       写错不会报错，只会被静默忽略当成 0 —— 这里务必用 min / sec。
 -- 用 >= 而不是 >：目标时刻那一秒会显示 0，循环计时才看得见「到点」的瞬间。
 local function FindTimeOnDay(sp, y, m, d, now)
+    -- ⚠ os.time 对太远的年份会返回 nil（Windows 的 C 运行时上限在 3000 年前后）。
+    --   拿 nil 去和 now 比较会抛 "attempt to compare nil with number"，
+    --   而且这里每秒都会被调用一次，会变成每秒刷屏报错。
+    --   所以每个 os.time 的结果都必须挡一道，不能只靠面板限制输入范围
+    --   （用户可以手改 Variables.inc 绕过面板）。
+    local dayEnd = os.time({ year = y, month = m, day = d, hour = 23, min = 59, sec = 59 })
+    if dayEnd == nil then return nil end
     -- 整天都已经过去就直接放弃，省掉最多 1440 次 os.time
-    if os.time({ year = y, month = m, day = d, hour = 23, min = 59, sec = 59 }) < now then
+    if dayEnd < now then
         return nil
     end
 
@@ -180,7 +195,7 @@ local function FindTimeOnDay(sp, y, m, d, now)
         for mi = miFrom, miTo do
             local t = os.time({ year = y, month = m, day = d,
                                 hour = h, min = mi, sec = sp.second })
-            if t >= now then return t end
+            if t ~= nil and t >= now then return t end
         end
     end
     return nil
@@ -209,6 +224,14 @@ function Common.NextTarget(sp, now)
     -- 逐日往后找（从今天开始）
     local t = os.date('*t', now)
     local y, m, d = t.year, t.month, t.day
+    -- 年固定且在将来时，直接跳到那一年的 1 月 1 日再扫。
+    -- 否则要从今天一天天挪过去，目标年越远空转越多 ——
+    -- TargetYear 很远时（旧上限 9999）是约 290 万次，而这里每秒都会被调用一次，
+    -- 皮肤会明显卡顿。跳过去以后最多只需扫 366 天。
+    -- （跳过的那些天 sp.year 不可能等于 y，本来就不会命中。）
+    if sp.year and sp.year > y then
+        y, m, d = sp.year, 1, 1
+    end
     local dim = Common.DaysInMonth(y, m)
 
     for _ = 1, MaxSearchDays(sp, now) do
@@ -238,9 +261,13 @@ end
 -- 阈值来自 Layout.inc：UnitSwitchDay（小时）、UnitSwitchHour（分钟）、
 -- UnitSwitchMinute（秒）。数值一律向下取整。
 function Common.PickUnit(rem)
-    local day    = (tonumber(SKIN:GetVariable('UnitSwitchDay'))    or 72) * 3600
-    local hour   = (tonumber(SKIN:GetVariable('UnitSwitchHour'))   or 120) * 60
-    local minute = (tonumber(SKIN:GetVariable('UnitSwitchMinute')) or 90)
+    -- 下限兜底：这三个值直接来自配置文件。手改成 0 或负数时，
+    -- 「rem >= 0」永远成立 → 一律用天，剩余 20 小时会显示成「0 天」。
+    -- 控制面板的输入校验已经限制了下限（24 / 60 / 60），这里再挡一道，
+    -- 保证手改 Variables.inc 也不会出现「0 天」。
+    local day    = math.max(24, tonumber(SKIN:GetVariable('UnitSwitchDay'))    or 72) * 3600
+    local hour   = math.max(60, tonumber(SKIN:GetVariable('UnitSwitchHour'))   or 120) * 60
+    local minute = math.max(60, tonumber(SKIN:GetVariable('UnitSwitchMinute')) or 90)
 
     if rem >= day then return 1, math.floor(rem / 86400) end
     if rem >= hour then return 2, math.floor(rem / 3600) end

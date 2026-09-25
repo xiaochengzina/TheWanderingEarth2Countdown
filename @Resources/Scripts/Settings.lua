@@ -79,24 +79,24 @@ local VALUE_METERS = {
 -- min/max 合法范围
 -- zeroIsWild  填 0 是否等于「留空」
 -- stepWild    步进器是否会走到「循环」这一档
---              （年只有 1970–9999 两档邻居，走不到循环，只能靠清空输入框）
+--              （年在 1970–3000 之间 ±1，走不到循环，只能靠清空输入框清空）
 -- noWild      不允许留空（单位阈值就是这种）；值不合法时显示 def
 -- def         上面那种情况的兜底显示值
 local FIELDS = {
     -- 目标时间（控制面板第 1 页）
-    { id = 'Year',  var = 'TargetYear',   min = 1970, max = 9999, zeroIsWild = true,  stepWild = false },
+    { id = 'Year',  var = 'TargetYear',   min = 1970, max = 3000, zeroIsWild = true,  stepWild = false },
     { id = 'Month', var = 'TargetMonth',  min = 1,    max = 12,   zeroIsWild = true,  stepWild = true },
     { id = 'Day',   var = 'TargetDay',    min = 1,    max = 31,   zeroIsWild = true,  stepWild = true },
     { id = 'Hour',  var = 'TargetHour',   min = 0,    max = 23,   zeroIsWild = false, stepWild = true },
     { id = 'Min',   var = 'TargetMinute', min = 0,    max = 59,   zeroIsWild = false, stepWild = true },
-    { id = 'Sec',   var = 'TargetSecond', min = 0,    max = 59,   zeroIsWild = false, stepWild = false },
+    { id = 'Sec',   var = 'TargetSecond', min = 0,    max = 59,   zeroIsWild = false, stepWild = false, noWild = true, def = 0 },
 
     -- 单位切换阈值（控制面板第 3 页「单位」）
     -- 下限都取「刚好还能显示出 1 个该单位」的值，否则会出现「0 天」这种显示
     --（例：天阈值若小于 24 小时，剩余 20 小时时会显示 0 天）
-    { id = 'UnitDay',    var = 'UnitSwitchDay',    min = 24, max = 8760,  zeroIsWild = false, stepWild = false, noWild = true, def = 72 },
-    { id = 'UnitHour',   var = 'UnitSwitchHour',   min = 60, max = 10080, zeroIsWild = false, stepWild = false, noWild = true, def = 120 },
-    { id = 'UnitMinute', var = 'UnitSwitchMinute', min = 60, max = 3600,  zeroIsWild = false, stepWild = false, noWild = true, def = 90 },
+    { id = 'UnitDay',    var = 'UnitSwitchDay',    min = 24, max = 8760,  zeroIsWild = false, stepWild = false, noWild = true, def = 72, clamp = true },
+    { id = 'UnitHour',   var = 'UnitSwitchHour',   min = 60, max = 10080, zeroIsWild = false, stepWild = false, noWild = true, def = 120, clamp = true },
+    { id = 'UnitMinute', var = 'UnitSwitchMinute', min = 60, max = 3600,  zeroIsWild = false, stepWild = false, noWild = true, def = 90, clamp = true },
 }
 
 local FIELD_BY_ID = {}
@@ -232,7 +232,7 @@ local function SyncFields()
         -- 越界值按留空显示，和主皮肤的判定保持一致
         if not isWild and (n == nil or n < f.min or n > f.max) then isWild = true end
         -- 不允许留空的字段（单位阈值）：退回兜底值，永远显示一个数字
-        if isWild and f.noWild then isWild = false; n = f.def end
+            if isWild and f.noWild then isWild = false; n = f.def or f.min end
 
         if isWild then
             -- 「循环」两个字从 Settings.ini 的变量读：Lua 里写中文字面量会被
@@ -262,8 +262,13 @@ function ShowPage(n)
     EnsureLoaded()
     n = Common.ClampInt(n, 1, PAGE_COUNT, 1)
     CurrentPage = n
-    -- 持久化当前页：刷新面板后仍停留在本页
-    Common.WriteVar('SettingsPage', n)
+    -- 持久化当前页：刷新面板后仍停留在本页。
+    -- ⚠ 只在页码真的变了才写文件。否则面板每次加载 / 刷新都会写一次
+    --   Variables.inc —— 既多余，又让这个受版本管理的文件永远处于
+    --   「已修改」状态，提交时老是混进噪音。
+    if tostring(SKIN:GetVariable('SettingsPage', '')) ~= tostring(n) then
+        Common.WriteVar('SettingsPage', n)
+    end
     SKIN:Bang('!SetVariable', 'SettingsPage', tostring(n))
     for i = 1, PAGE_COUNT do
         SKIN:Bang(i == n and '!ShowMeterGroup' or '!HideMeterGroup', 'Page' .. i)
@@ -363,7 +368,14 @@ function StepField(id, delta)
                 ApplyField(f, nil)
                 return
             end
+        elseif f.clamp then
+            -- 阈值字段：到端点就停住。
+            -- 绕圈在这里很反直觉 —— 在「天 24 小时」按减号会跳到 8760。
+            if nextVal > f.max then nextVal = f.max
+            elseif nextVal < f.min then nextVal = f.min end
         else
+            -- 日期 / 秒：在范围里绕圈
+            -- （秒 59→0、年 3000→1970 都符合直觉）
             if nextVal > f.max then nextVal = f.min
             elseif nextVal < f.min then nextVal = f.max end
         end
@@ -380,7 +392,13 @@ function SetFieldValue(id, raw)
 
     raw = tostring(raw or ''):match('^%s*(.-)%s*$')
     if raw == '' then
-        ApplyField(f, nil)
+        -- 留空 = 通配。但秒这类字段不支持留空（noWild），清空要落回默认值，
+        -- 否则文件里会留下空值，而面板把空值当成「循环」显示出来。
+        if f.noWild then
+            ApplyField(f, f.def)
+        else
+            ApplyField(f, nil)
+        end
         return
     end
 

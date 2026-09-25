@@ -114,7 +114,7 @@ end
 
 function DaysSpacing()
     EnsureCommon()
-    return string.format('%.3f', Common.GetNum('DaysSpacing', -4.32) * Common.GetNum('Scale', 1))
+    return string.format('%.3f', Common.GetNum('DaysSpacing', 0) * Common.GetNum('Scale', 1))
 end
 
 -- ------------------------------------------------------------- 重绘 -------
