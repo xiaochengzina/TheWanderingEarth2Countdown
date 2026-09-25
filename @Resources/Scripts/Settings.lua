@@ -150,14 +150,14 @@ local function SliderText(id, v)
     return tostring(v)
 end
 
--- 滑块的主色。现在只剩整体缩放一个滑块，固定用强调色。
+-- 滑块的主色。现在只剩整体缩放一个滑块，固定用**面板自己的**强调色
 -- （颜色不再用滑块调，改成了 RainRGB4 取色器，见 Settings.ini 的「外观」页）
 local function SliderTint(id)
     local s = SLIDERS[id]
     if s and s.kind == 'color' and s.var then
         return SKIN:GetVariable(s.var, '234,10,3')
     end
-    return SKIN:GetVariable('ColorAccent', '234,10,3')
+    return SKIN:GetVariable('UiAccent', '234,10,3')
 end
 
 -- 滑块外观：填充宽度 + 旋钮位置 + 数值文字
@@ -183,7 +183,7 @@ local function SliderValue(id)
     return Common.ClampInt(Common.ColorChannel(SKIN:GetVariable(s.var, ''), s.ch, 0), s.min, s.max, 0)
 end
 
--- 颜色：色块的填充色直接引用 #ColorAccent# / #ColorText#，
+-- 颜色：色块的填充色直接引用用户配置里的 #ColorAccent# / #ColorText#，
 -- 所以不需要 Lua 去画；这里只负责把值推给主皮肤。
 --
 -- 为什么要推：点击色块是 RainRGB4.exe 自己去改 Variables.inc 并刷新皮肤，
@@ -241,7 +241,7 @@ local function SyncFields()
             SKIN:Bang('!SetOption', f.id .. 'Val', 'FontColor', '#ColorHint#')
         else
             SKIN:Bang('!SetOption', f.id .. 'Val', 'Text', tostring(math.floor(n)))
-            SKIN:Bang('!SetOption', f.id .. 'Val', 'FontColor', '#ColorText#')
+            SKIN:Bang('!SetOption', f.id .. 'Val', 'FontColor', '#UiText#')
         end
     end
 end
