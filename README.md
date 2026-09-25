@@ -8,6 +8,15 @@
 
 ## 一、安装
 
+### 方式 A：用安装包（推荐）
+
+下载 `TheWanderingEarth2Countdown_1.2.0.zip` 解压，双击里面的
+`TheWanderingEarth2Countdown_1.2.0.rmskin`，Rainmeter 会自动装好并加载皮肤。
+
+包里还附了一份 `Rainmeter-4.5.26.exe` —— 电脑上还没装 Rainmeter 的话先装它。
+
+### 方式 B：手动放文件夹
+
 1. 把 `TheWanderingEarth2Countdown` 整个文件夹放进
    `文档\Rainmeter\Skins\`，最终路径是
    `文档\Rainmeter\Skins\TheWanderingEarth2Countdown\`。
@@ -26,7 +35,7 @@
 
 ## 二、控制面板
 
-面板是 `Settings\Settings.ini`，深色 + 红配色，共三页：
+面板是 `Settings\Settings.ini`，深色 + 红配色，共四页：
 
 | 页 | 内容 |
 | --- | --- |

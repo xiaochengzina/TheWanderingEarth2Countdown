@@ -34,7 +34,7 @@ EnText=THE SOLAR HELIUM FLASH
 ;   年 / 月 / 日 → 删掉等号后面的值，或者写 0（0 年 0 月 0 日本来就不合法）
 ;   时 / 分      → 必须把值删掉；写 0 就是真的 0 点 / 0 分
 ;   秒           → 不支持留空，删掉按 0 处理
-TargetYear=2077
+TargetYear=2078
 TargetMonth=1
 TargetDay=1
 TargetHour=0
