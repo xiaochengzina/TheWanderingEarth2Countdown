@@ -4,12 +4,12 @@
 #
 # 所以这里用 working-tree-encoding：
 #   仓库里存 UTF-8（网页可读、可 diff）
-#   检出到工作区时 git 自动转回 UTF-16 LE + BOM（Rainmeter 才能读）
+#   检出到工作区时 git 自动转回 UTF-16 LE + BOM + CRLF（Rainmeter 才能读）
 #
 # ⚠ 需要 git >= 2.18。不认这个属性的客户端检出后会拿到 UTF-8，
 #   皮肤会变成一片空白 —— 遇到这种情况，把文件另存为 UTF-16 LE + BOM 即可。
-*.ini  text working-tree-encoding=UTF-16LE-BOM
-*.inc  text working-tree-encoding=UTF-16LE-BOM
+*.ini  text eol=crlf working-tree-encoding=UTF-16LE-BOM
+*.inc  text eol=crlf working-tree-encoding=UTF-16LE-BOM
 
 # 脚本与文档本来就是 UTF-8，不需要转换
 *.lua  text eol=lf
