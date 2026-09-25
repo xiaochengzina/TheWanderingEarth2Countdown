@@ -1,16 +1,24 @@
-# 皮肤文件（CountDown.ini / Settings.ini / *.inc）是 UTF-16 LE + BOM。
-# 必须当二进制处理：git 一旦做行尾转换就会把编码弄坏，皮肤随即变成一片空白。
-*.ini  -text
-*.inc  -text
+# Rainmeter 只认 UTF-16 LE + BOM 的皮肤文件（.ini / .inc）。
+# 但如果把 UTF-16 原样存进 git，GitHub 网页上会显示成 "Binary file not shown"，
+# 没法 review、没法 diff。
+#
+# 所以这里用 working-tree-encoding：
+#   仓库里存 UTF-8（网页可读、可 diff）
+#   检出到工作区时 git 自动转回 UTF-16 LE + BOM（Rainmeter 才能读）
+#
+# ⚠ 需要 git >= 2.18。不认这个属性的客户端检出后会拿到 UTF-8，
+#   皮肤会变成一片空白 —— 遇到这种情况，把文件另存为 UTF-16 LE + BOM 即可。
+*.ini  text working-tree-encoding=UTF-16LE-BOM
+*.inc  text working-tree-encoding=UTF-16LE-BOM
 
-# 脚本与文档是 UTF-8，统一用 LF，跨平台一致
+# 脚本与文档本来就是 UTF-8，不需要转换
 *.lua  text eol=lf
 *.md   text eol=lf
+*.txt  text eol=lf
 
 # 仓库自身的配置文件
 .gitattributes  text eol=lf
 .gitignore      text eol=lf
-*.txt  text eol=lf
 
 # 取色器是可执行文件，按二进制存
 *.exe  binary
