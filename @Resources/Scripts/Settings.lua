@@ -262,13 +262,11 @@ function ShowPage(n)
     EnsureLoaded()
     n = Common.ClampInt(n, 1, PAGE_COUNT, 1)
     CurrentPage = n
-    -- 持久化当前页：刷新面板后仍停留在本页。
-    -- ⚠ 只在页码真的变了才写文件。否则面板每次加载 / 刷新都会写一次
-    --   Variables.inc —— 既多余，又让这个受版本管理的文件永远处于
-    --   「已修改」状态，提交时老是混进噪音。
-    if tostring(SKIN:GetVariable('SettingsPage', '')) ~= tostring(n) then
-        Common.WriteVar('SettingsPage', n)
-    end
+    -- ⚠ 这里**不写回** SettingsPage。
+    --   SettingsPage 现在是「面板首页」而不是「上次停留的页」：
+    --   打开面板永远从它指定的那一页开始（出厂值 1 = 内容页），
+    --   在面板里翻到别的页不会改动它，下次打开还是首页。
+    --   （以前是「记住上次停留的页」，作者要求改成固定首页。）
     SKIN:Bang('!SetVariable', 'SettingsPage', tostring(n))
     for i = 1, PAGE_COUNT do
         SKIN:Bang(i == n and '!ShowMeterGroup' or '!HideMeterGroup', 'Page' .. i)
@@ -546,6 +544,9 @@ function Initialize()
     -- 取色器（RainRGB4）改完颜色只会刷新面板自己，主皮肤要在这里补一刀；
     -- 平时打开面板也走这一步，等于每次都用文件里的值重新同步一次，无副作用。
     PushColorsToMain()
+    -- 打开面板永远从「首页」开始。SettingsPage 是配置里的首页页码
+    --（出厂 1 = 内容页），不是上次停留的页 —— ShowPage 不会改写它。
+    -- 取不到值或越界时退回第 1 页（内容）。
     ShowPage(Common.ClampInt(SKIN:GetVariable('SettingsPage'), 1, PAGE_COUNT, 1))
     return 0
 end
