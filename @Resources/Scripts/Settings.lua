@@ -542,6 +542,14 @@ function ResetToDefaults()
     -- 配色、缩放、单位阈值）几乎都在首页和它后面的页上；停在高级页的话
     -- 用户看不出到底改了什么，体感像「点了没反应」。
     ShowPage(1)
+    -- 最后刷新面板自己。
+    -- 重置会改配色，而面板里不少地方的 #ColorAccent# / #ColorText# 是
+    -- **加载时**解析的（导航高亮是 !SetOption 换 MeterStyle，但页标题、
+    -- 滑块轨道、色块 Fill Color 都是），光靠 !SetVariable + !Redraw 不会
+    -- 跟着变 —— 表现是「重置了但面板还是旧配色」。
+    -- 刷新会重跑 Initialize，从刚写好的 Variables.inc 完整读一遍，
+    -- Initialize 里还会顺带把颜色推给主皮肤（PushColorsToMain）。
+    SKIN:Bang('!Refresh')
 end
 
 -- 关闭面板：把页码写回首页再卸载。
